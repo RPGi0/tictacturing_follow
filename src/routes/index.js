@@ -1,34 +1,36 @@
-import React from 'react';
-import {Route, IndexRoute} from 'react-router';
-import Template from '../containers/Template';
-import TicTacToe from '../containers/TicTacToe';
-import Profile from '../containers/Profile';
-import Relay from 'react-relay/classic';
+import React from 'react'
+import {Route, IndexRoute} from 'react-router'
+import Template from '../containers/Template'
+import TicTacToe from '../containers/TicTacToe'
+import Profile from '../containers/Profile'
+import Relay from 'react-relay'
+import auth from '../utils/auth'
 
 const ViewerQueries = {
   viewer: () => Relay.QL`query { viewer }`
-};
+}
 
 const createRoutes = () => {
   return (
     <Route
       path='/'
       component={Template}
-      query={ViewerQueries}
+      queries={ViewerQueries}
+      auth={auth}
     >
       <IndexRoute
         component={TicTacToe}
-        query={ViewerQueries}
+        queries={ViewerQueries}
       />
       <Route
         path={'/profile'}
         component={Profile}
-        query={ViewerQueries}
+        queries={ViewerQueries}
       />
     </Route>
   )
-};
+}
 
-const Routes = createRoutes();
+const Routes = createRoutes()
 
-export default Routes;
+export default Routes

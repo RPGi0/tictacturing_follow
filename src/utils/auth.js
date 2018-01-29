@@ -1,74 +1,135 @@
-import Auth0Lock from 'auth0-lock';
-const authDomain = 'rp-gio.auth0.com';
-const clientId = 'nYcSoBjarc1oz6Pyq00e0CsftCFElqq4';
+import Auth0Lock from 'auth0-lock'
+import Relay from 'react-relay'
+const authDomain = 'carlpeaslee.auth0.com'
+const clientId = 'kpcjF5KAIOOGe2Sm4n4NnPFjFhg9YwPI'
+import CreateUser from '../mutations/CreateUser'
+import SigninUser from '../mutations/SigninUser'
 
 class AuthService {
-    constructor () {
-        this.lock = new Auth0Lock(clientId, authDomain, {
-            auth: {
-                params: {
-                    scope: 'openid email'
-                },
-            },
-        });
+  constructor() {
+    this.lock = new Auth0Lock(clientId, authDomain, {
+      auth: {
+        params: {
+          scope: 'openid email'
+        },
+      },
+    })
 
-        this.showLock= this.showLock.bind(this);
+    this.showLock = this.showLock.bind(this)
 
-        this.lock.on('authenticate', this.authProcess.bind(this));
+    this.lock.on('authenticated', this.authProcess.bind(this))
+  }
+
+  authProcess = (authResult) => {
+    let {
+      email,
+      exp
+    } = authResult.idTokenPayload
+    const idToken = authResult.idToken
+
+    this.signinUser({
+      idToken,
+      email,
+      exp
+    }).then(
+      success => success,
+      rejected => {
+        this.createUser({
+          idToken,
+          email,
+          exp
+        }).then()
+      }
+    )
+
+  }
+
+  showLock() {
+    this.lock.show()
+  }
+
+  setToken = (authFields) => {
+    let {
+      idToken,
+      exp
+    } = authFields
+    localStorage.setItem('idToken', idToken)
+    localStorage.setItem('exp', exp * 1000)
+  }
+
+  isCurrent = () => {
+    let expString = localStorage.getItem('exp')
+    if (!expString) {
+      localStorage.removeItem('idToken')
+      return false
     }
-
-    authProcess = (authResult) => {
-        console.log(authResult)
-    };
-
-    showLock() {
-        this.lock.show()
+    let now = new Date()
+    let exp = new Date(parseInt(expString, 10)) //10 is radix parameter
+    if ( exp < now ) {
+      this.logout()
+      return false
+    } else {
+      return true
     }
+  }
 
-    setToken = (authFields) => {
-        let {
-            idToken,
-            exp
-        } = authFields;
-        localStorage.setItem('idToken', idToken);
-        localStorage.setItem('exp', exp * 1000);
-    };
+  getToken() {
+    let idToken = localStorage.getItem('idToken')
+    if (this.isCurrent() && idToken) {
+      return idToken
+    } else {
+      localStorage.removeItem('idToken')
+      localStorage.removeItem('exp')
+      return false
+    }
+  }
 
-    isCurrent = () => {
-        let expString = localStorage.getItem('exp');
-        if (!expString) {
-            localStorage.removeItem('idToken');
-            return false
+  logout = () => {
+    localStorage.removeItem('idToken')
+    localStorage.removeItem('exp')
+    location.reload()
+  }
+
+  createUser = (authFields) => {
+    return new Promise( (resolve, reject) => {
+      Relay.Store.commitUpdate(
+        new CreateUser({
+          email: authFields.email,
+          idToken: authFields.idToken
+        }), {
+          onSuccess: (response) => {
+            this.signinUser(authFields)
+            resolve(response)
+          },
+          onFailure: (response) => {
+            console.log('CreateUser error', response)
+            reject(response)
+          }
         }
-        let now = new Date();
-        let exp = new Date(parseInt(expString, 10)); // 10 is radix parameter
-        if ( exp < now ) {
-            this.logout();
-            return false
-        } else {
-            return true
-        }
-    };
+      )
+    })
+  }
 
-    getToken() {
-        let idToken = localStorage.getItem('idToken');
-        if (this.isCurrent() && idToken) {
-            return idToken
-        } else {
-            localStorage.removeItem('idToken');
-            localStorage.removeItem('exp');
-            return false
+  signinUser = (authFields) => {
+    return new Promise( (resolve, reject) => {
+      Relay.Store.commitUpdate(
+        new SigninUser({
+          idToken: authFields.idToken
+        }), {
+          onSuccess: (response) => {
+            this.setToken(authFields)
+            resolve(response)
+          },
+          onFailure: (response) => {
+            reject(response)
+          }
         }
-    }
-
-    logout = () => {
-        localStorage.removeItem('idToken');
-        localStorage.removeItem('exp');
-        window.location.reload()
-    }
+      )
+    })
+  }
 
 }
 
-const auth = new AuthService();
+const auth = new AuthService()
 
-export default auth;
+export default auth
